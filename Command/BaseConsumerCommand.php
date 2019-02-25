@@ -91,7 +91,7 @@ abstract class BaseConsumerCommand extends BaseRabbitMqCommand
         try {
             return $this->consumer->consume($this->amount);
         } catch (ErrorException $e) {
-            if ($e->getMessage() === 'stream_select(): unable to select [4]: Interrupted system call (max_fd=7)') {
+            if (preg_match('#stream_select\(\): unable to select \[\d+\]: Interrupted system call \(max_fd\=\d+\)#', $e->getMessage()) === 1) {
                 return 0;
             }
 
