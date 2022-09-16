@@ -2,6 +2,7 @@
 
 namespace OldSound\RabbitMqBundle\DependencyInjection;
 
+use OldSound\RabbitMqBundle\RabbitMq\Producer;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
@@ -28,11 +29,11 @@ class Configuration implements ConfigurationInterface
         $this->name = $name;
     }
 
-    public function getConfigTreeBuilder()
+    public function getConfigTreeBuilder(): TreeBuilder
     {
-        $tree = new TreeBuilder();
-
-        $rootNode = $tree->root($this->name);
+        $tree = new TreeBuilder($this->name);
+        /** @var ArrayNodeDefinition $rootNode */
+        $rootNode = $tree->getRootNode();
 
         $rootNode
             ->children()
@@ -72,6 +73,22 @@ class Configuration implements ConfigurationInterface
                             ->scalarNode('user')->defaultValue('guest')->end()
                             ->scalarNode('password')->defaultValue('guest')->end()
                             ->scalarNode('vhost')->defaultValue('/')->end()
+                            ->arrayNode('hosts')
+                                ->info('connection_timeout, read_write_timeout, use_socket, ssl_context, keepalive, 
+                                        heartbeat and connection_parameters_provider should be specified globally when
+                                        you are using multiple hosts')
+                                ->canBeUnset()
+                                ->prototype('array')
+                                    ->children()
+                                        ->scalarNode('url')->defaultValue('')->end()
+                                        ->scalarNode('host')->defaultValue('localhost')->end()
+                                        ->scalarNode('port')->defaultValue(5672)->end()
+                                        ->scalarNode('user')->defaultValue('guest')->end()
+                                        ->scalarNode('password')->defaultValue('guest')->end()
+                                        ->scalarNode('vhost')->defaultValue('/')->end()
+                                    ->end()
+                                ->end()
+                            ->end()
                             ->booleanNode('lazy')->defaultFalse()->end()
                             ->scalarNode('connection_timeout')->defaultValue(3)->end()
                             ->scalarNode('read_write_timeout')->defaultValue(3)->end()
@@ -108,6 +125,9 @@ class Configuration implements ConfigurationInterface
                             ->scalarNode('class')->defaultValue('%old_sound_rabbit_mq.producer.class%')->end()
                             ->scalarNode('enable_logger')->defaultFalse()->end()
                             ->scalarNode('service_alias')->defaultValue(null)->end()
+                            ->scalarNode('default_routing_key')->defaultValue('')->end()
+                            ->scalarNode('default_content_type')->defaultValue(Producer::DEFAULT_CONTENT_TYPE)->end()
+                            ->integerNode('default_delivery_mode')->min(1)->max(2)->defaultValue(2)->end()
                         ->end()
                     ->end()
                 ->end()
@@ -155,6 +175,7 @@ class Configuration implements ConfigurationInterface
                             ->scalarNode('callback')->isRequired()->end()
                             ->scalarNode('idle_timeout')->end()
                             ->scalarNode('idle_timeout_exit_code')->end()
+                            ->scalarNode('timeout_wait')->end()
                             ->arrayNode('graceful_max_execution')
                                 ->canBeUnset()
                                 ->children()
@@ -193,6 +214,7 @@ class Configuration implements ConfigurationInterface
                         ->scalarNode('connection')->defaultValue('default')->end()
                         ->scalarNode('idle_timeout')->end()
                         ->scalarNode('idle_timeout_exit_code')->end()
+                        ->scalarNode('timeout_wait')->end()
                         ->scalarNode('auto_setup_fabric')->defaultTrue()->end()
                         ->arrayNode('graceful_max_execution')
                             ->canBeUnset()
@@ -217,7 +239,7 @@ class Configuration implements ConfigurationInterface
             ->end()
         ;
     }
-    
+
     protected function addDynamicConsumers(ArrayNodeDefinition $node)
     {
         $node
@@ -233,6 +255,14 @@ class Configuration implements ConfigurationInterface
                             ->scalarNode('callback')->isRequired()->end()
                             ->scalarNode('idle_timeout')->end()
                             ->scalarNode('idle_timeout_exit_code')->end()
+                            ->scalarNode('timeout_wait')->end()
+                            ->arrayNode('graceful_max_execution')
+                                ->canBeUnset()
+                                ->children()
+                                    ->integerNode('timeout')->end()
+                                    ->integerNode('exit_code')->defaultValue(0)->end()
+                                ->end()
+                            ->end()
                             ->scalarNode('auto_setup_fabric')->defaultTrue()->end()
                             ->arrayNode('qos_options')
                                 ->canBeUnset()
@@ -429,7 +459,7 @@ class Configuration implements ConfigurationInterface
                 ->scalarNode('ticket')->defaultNull()->end()
                 ->arrayNode('routing_keys')
                     ->prototype('scalar')->end()
-                    ->defaultValue(array())
+                    ->defaultValue([])
                 ->end()
             ->end()
         ;
