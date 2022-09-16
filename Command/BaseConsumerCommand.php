@@ -2,6 +2,7 @@
 
 namespace OldSound\RabbitMqBundle\Command;
 
+use ErrorException;
 use OldSound\RabbitMqBundle\RabbitMq\BaseConsumer as Consumer;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use Symfony\Component\Console\Input\InputArgument;
@@ -92,7 +93,15 @@ abstract class BaseConsumerCommand extends BaseRabbitMqCommand
 
         $this->initConsumer($input);
 
-        return $this->consumer->consume($this->amount);
+        try {
+            return $this->consumer->consume($this->amount);
+        } catch (ErrorException $e) {
+            if (preg_match('#stream_select\(\): unable to select \[\d+\]: Interrupted system call \(max_fd\=\d+\)#', $e->getMessage()) === 1) {
+                return 0;
+            }
+
+            throw $e;
+        }
     }
 
     protected function initConsumer(InputInterface $input)
